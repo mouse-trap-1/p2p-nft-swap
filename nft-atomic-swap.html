@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Manifest — Atomic NFT Swap</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
+<style>
+  :root{
+    --ink:#0c0f0e; --panel:#131817; --panel-2:#181f1d; --line:#2a3532;
+    --paper:#e9e4d8; --paper-dim:#a9a294;
+    --brass:#c79a56; --brass-bright:#e3b96f;
+    --verdigris:#4fa899; --danger:#c65b4e;
+    --radius:2px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(1200px 600px at 15% -10%, rgba(79,168,153,0.07), transparent 60%),
+      radial-gradient(900px 500px at 100% 10%, rgba(199,154,86,0.06), transparent 55%),
+      var(--ink);
+    color:var(--paper);
+    font-family:'JetBrains Mono', monospace;
+    min-height:100vh;
+    padding:32px 20px 80px;
+  }
+  .display{font-family:'Fraunces', serif;}
+  .wrap{max-width:1040px;margin:0 auto;}
+
+  header.top{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;margin-bottom:32px;flex-wrap:wrap;}
+  .brand{display:flex;flex-direction:column;gap:6px;}
+  .brand .mark{font-family:'Fraunces',serif;font-weight:700;font-size:30px;color:var(--paper);}
+  .brand .mark span{color:var(--brass-bright);}
+  .brand .tagline{font-size:12px;color:var(--paper-dim);letter-spacing:0.06em;text-transform:uppercase;}
+  .wallet-box{display:flex;flex-direction:column;align-items:flex-end;gap:8px;}
+  button{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;cursor:pointer;border-radius:var(--radius);letter-spacing:0.03em;}
+  .btn-connect{background:var(--brass);color:#1b1408;border:1px solid var(--brass);padding:10px 18px;text-transform:uppercase;font-size:12px;}
+  .btn-connect:hover{background:var(--brass-bright);}
+  .btn-connect:disabled{opacity:0.5;cursor:not-allowed;}
+  .wallet-meta{font-size:11px;color:var(--paper-dim);text-align:right;}
+  .wallet-meta strong{color:var(--verdigris);}
+
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:24px;margin-bottom:24px;position:relative;}
+  .panel::before{content:attr(data-tab);position:absolute;top:-11px;left:20px;background:var(--ink);padding:0 8px;font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:var(--brass-bright);font-weight:600;}
+
+  label{display:block;font-size:11px;color:var(--paper-dim);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;}
+  input[type=text], input[type=number], select{width:100%;background:var(--ink);border:1px solid var(--line);color:var(--paper);padding:10px 12px;font-family:'JetBrains Mono',monospace;font-size:13px;border-radius:var(--radius);}
+  input:focus, select:focus{outline:2px solid var(--verdigris);outline-offset:1px;}
+  .field{margin-bottom:14px;}
+
+  .choice-row{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
+  @media(max-width:680px){.choice-row{grid-template-columns:1fr;}}
+  .choice-card{border:1px solid var(--line);border-radius:var(--radius);padding:20px;background:var(--panel-2);}
+  .choice-card h3{margin:0 0 6px;font-family:'Fraunces',serif;font-size:18px;color:var(--paper);}
+  .choice-card p{margin:0 0 16px;font-size:12px;color:var(--paper-dim);line-height:1.6;}
+
+  .grid-row{display:grid;grid-template-columns:2.2fr 1fr 1.1fr 0.8fr;gap:12px;align-items:end;}
+  @media(max-width:680px){.grid-row{grid-template-columns:1fr 1fr;}}
+
+  .btn-add{background:transparent;border:1px solid var(--verdigris);color:var(--verdigris);padding:10px 16px;width:100%;text-transform:uppercase;font-size:12px;}
+  .btn-add:hover{background:var(--verdigris);color:#08211d;}
+  .btn-add:disabled{opacity:0.4;cursor:not-allowed;}
+
+  .btn-primary{background:var(--brass);color:#1b1408;border:1px solid var(--brass);padding:12px 18px;text-transform:uppercase;font-size:12px;width:100%;}
+  .btn-primary:hover{background:var(--brass-bright);}
+  .btn-primary:disabled{opacity:0.4;cursor:not-allowed;}
+  .btn-ghost{background:transparent;border:1px solid var(--line);color:var(--paper-dim);padding:10px 16px;text-transform:uppercase;font-size:11px;}
+  .btn-ghost:hover{border-color:var(--paper-dim);color:var(--paper);}
+  .btn-danger{background:transparent;border:1px solid var(--danger);color:var(--danger);padding:10px 16px;text-transform:uppercase;font-size:11px;}
+  .btn-danger:hover{background:var(--danger);color:#1b0d0a;}
+
+  .manifest{border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;}
+  .manifest-head, .manifest-row{display:grid;grid-template-columns:28px 2fr 0.8fr 0.6fr 0.9fr 24px;gap:8px;align-items:center;padding:9px 12px;}
+  .manifest-head{background:var(--panel-2);font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:var(--paper-dim);border-bottom:1px dashed var(--line);}
+  .manifest-row{border-bottom:1px dashed var(--line);font-size:12px;}
+  .manifest-row:last-child{border-bottom:none;}
+  .manifest-row .num{color:var(--brass-bright);font-weight:700;}
+  .manifest-row .addr{color:var(--paper);}
+  .manifest-row .sub{color:var(--paper-dim);font-size:10px;}
+  .manifest-row .floor{color:var(--verdigris);font-weight:600;}
+  .manifest-row .floor.pending{color:var(--paper-dim);font-style:italic;font-weight:400;}
+  .remove-btn{background:transparent;border:none;color:var(--danger);font-size:16px;cursor:pointer;line-height:1;padding:0;}
+  .empty-manifest{padding:22px 14px;text-align:center;color:var(--paper-dim);font-size:12px;}
+
+  .tally{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:var(--panel-2);border:1px solid var(--line);border-top:none;}
+  .tally .label{font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:var(--paper-dim);}
+  .tally .amount{font-family:'Fraunces',serif;font-size:20px;font-weight:600;color:var(--brass-bright);}
+  .tally .amount small{font-size:12px;color:var(--paper-dim);font-family:'JetBrains Mono',monospace;}
+
+  .sides{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
+  @media(max-width:800px){.sides{grid-template-columns:1fr;}}
+  .side-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+  .side-head h4{margin:0;font-family:'Fraunces',serif;font-size:16px;font-weight:600;color:var(--paper);}
+  .badge{font-size:9.5px;text-transform:uppercase;letter-spacing:0.06em;padding:3px 8px;border-radius:20px;border:1px solid var(--line);color:var(--paper-dim);}
+  .badge.on{border-color:var(--verdigris);color:var(--verdigris);}
+  .badge.wait{border-color:var(--brass);color:var(--brass-bright);}
+
+  .trade-bar{display:flex;flex-wrap:wrap;gap:16px 28px;align-items:center;justify-content:space-between;margin-bottom:20px;padding:14px 18px;background:var(--panel-2);border:1px solid var(--brass);border-radius:var(--radius);}
+  .trade-bar .id-block{font-size:11px;color:var(--paper-dim);}
+  .trade-bar .id-block strong{color:var(--brass-bright);font-size:13px;}
+  .link-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+  .link-row input{flex:1;min-width:220px;}
+
+  .diff-strip{margin-top:16px;padding:12px 16px;border-left:2px solid var(--brass);font-size:12px;color:var(--paper-dim);line-height:1.6;}
+  .diff-strip strong{color:var(--paper);}
+
+  .actions-row{display:flex;gap:12px;margin-top:20px;flex-wrap:wrap;}
+  .actions-row > *{flex:1;min-width:180px;}
+
+  .log{margin-top:18px;font-size:12px;line-height:1.7;max-height:220px;overflow-y:auto;}
+  .log-line{padding:6px 0;border-bottom:1px dashed var(--line);}
+  .log-line:last-child{border-bottom:none;}
+  .log-line.ok{color:var(--verdigris);}
+  .log-line.err{color:var(--danger);}
+  .log-line.info{color:var(--paper-dim);}
+  .log-line a{color:var(--brass-bright);}
+
+  .note{font-size:11.5px;color:var(--paper-dim);line-height:1.6;border-left:2px solid var(--brass);padding-left:12px;margin-top:16px;}
+  .hidden{display:none !important;}
+  select{appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><path d='M0 0l5 6 5-6z' fill='%23a9a294'/></svg>");background-repeat:no-repeat;background-position:right 12px center;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div class="brand">
+      <div class="mark">Manifest<span>.</span></div>
+      <div class="tagline">Atomic NFT-for-NFT swaps</div>
+    </div>
+    <div class="wallet-box">
+      <button class="btn-connect" id="connectBtn">Connect wallet</button>
+      <div class="wallet-meta" id="walletMeta">No wallet connected</div>
+    </div>
+  </header>
+
+  <!-- ============ ENTRY: choose new trade or join ============ -->
+  <div id="entryView">
+    <div class="panel" data-tab="Network">
+      <div class="field" style="margin-bottom:0;">
+        <label for="chainSelect">Network</label>
+        <select id="chainSelect">
+          <option value="ethereum" data-chainid="1">Ethereum Mainnet</option>
+          <option value="matic" data-chainid="137">Polygon</option>
+          <option value="arbitrum" data-chainid="42161">Arbitrum One</option>
+          <option value="optimism" data-chainid="10">Optimism</option>
+          <option value="base" data-chainid="8453">Base</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="choice-row">
+      <div class="choice-card">
+        <h3>Start a new trade</h3>
+        <p>Build your offer and approve it for transfer. Nothing moves yet — you'll get a secret key to send the other party so they can add their side.</p>
+        <button class="btn-primary" id="goNewTrade">New trade</button>
+      </div>
+      <div class="choice-card">
+        <h3>Join a trade</h3>
+        <p>Paste the trade ID and secret key someone sent you (or the full link) to open the trade and add your offer.</p>
+        <div class="field">
+          <label for="joinLink">Trade link, or ID + secret</label>
+          <input type="text" id="joinLink" placeholder="Paste link, or 'tradeId:secret'">
+        </div>
+        <button class="btn-primary" id="goJoinTrade">Join trade</button>
+      </div>
+    </div>
+
+    <div class="note">
+      This page expects a swap contract with <code>createTrade</code>, <code>joinTrade</code>, <code>setManifest</code>, <code>confirmManifest</code>,
+      <code>executeSwap</code>, <code>cancelTrade</code>, <code>getTrade</code>, and <code>getManifest</code> — see the config block at the top of the
+      script for exact signatures. Point <code>SWAP_ADDRESS</code> at your deployed contract once it's live. Items never leave either wallet until
+      <code>executeSwap</code> runs — that one call should pull every item on both sides with <code>transferFrom</code>/<code>safeTransferFrom</code>
+      and revert the whole transaction if any single leg fails.
+    </div>
+  </div>
+
+  <!-- ============ BUILDER: compose a manifest (shared by new + join) ============ -->
+  <div id="builderView" class="hidden">
+    <div class="panel" data-tab="Add item">
+      <div class="grid-row">
+        <div class="field" style="margin-bottom:0;">
+          <label for="nftAddr">Contract address</label>
+          <input type="text" id="nftAddr" placeholder="0x…">
+        </div>
+        <div class="field" style="margin-bottom:0;">
+          <label for="tokenId">Token ID</label>
+          <input type="text" id="tokenId" placeholder="1234">
+        </div>
+        <div class="field" style="margin-bottom:0;">
+          <label for="standard">Standard</label>
+          <select id="standard"><option value="721">ERC-721</option><option value="1155">ERC-1155</option></select>
+        </div>
+        <div class="field" style="margin-bottom:0;">
+          <label for="qty">Qty</label>
+          <input type="number" id="qty" value="1" min="1">
+        </div>
+      </div>
+      <div style="margin-top:14px;"><button class="btn-add" id="addBtn">+ Add to your offer</button></div>
+      <div class="field" style="margin-top:14px;margin-bottom:0;">
+        <label for="apiKey">OpenSea API key (optional, kept in this browser tab only)</label>
+        <input type="text" id="apiKey" placeholder="Paste key to enable floor price lookups">
+      </div>
+    </div>
+
+    <div class="panel" data-tab="Your offer" style="padding:0;overflow:hidden;">
+      <div class="manifest-head"><div>#</div><div>Item</div><div>Std</div><div>Qty</div><div>Floor</div><div></div></div>
+      <div id="builderManifestBody"><div class="empty-manifest" id="builderEmpty">Nothing added yet.</div></div>
+    </div>
+    <div class="tally"><div class="label">Your offer total (floor est.)</div><div class="amount" id="builderTally">0.00<small> ETH</small></div></div>
+
+    <button class="btn-primary" id="lockInBtn" style="margin-top:20px;" disabled>Approve &amp; submit offer</button>
+    <div class="note" id="builderModeNote"></div>
+  </div>
+
+  <!-- ============ TRADE ROOM ============ -->
+  <div id="tradeRoomView" class="hidden">
+    <div class="trade-bar">
+      <div class="id-block">Trade <strong id="tradeIdLabel">—</strong> · you are <strong id="roleLabel">—</strong></div>
+      <div class="link-row" id="secretRow">
+        <input type="text" id="shareLink" readonly>
+        <button class="btn-ghost" id="copyLinkBtn">Copy invite link</button>
+      </div>
+      <button class="btn-ghost" id="refreshBtn">Refresh trade</button>
+    </div>
+
+    <div class="sides">
+      <div class="panel" data-tab="Your side" style="padding:16px;">
+        <div class="side-head"><h4>Your offer</h4><span class="badge" id="mineBadge">not submitted</span></div>
+        <div class="manifest" style="margin-bottom:0;">
+          <div class="manifest-head" style="grid-template-columns:22px 2fr 0.7fr 0.5fr 0.8fr;"><div>#</div><div>Item</div><div>Std</div><div>Qty</div><div>Floor</div></div>
+          <div id="mineManifestBody"><div class="empty-manifest">Nothing offered yet.</div></div>
+        </div>
+        <div class="tally"><div class="label">Your total</div><div class="amount" id="mineTally">0.00<small> ETH</small></div></div>
+        <button class="btn-primary" id="submitMineBtn" style="margin-top:14px;">Approve &amp; submit your offer</button>
+      </div>
+
+      <div class="panel" data-tab="Their side" style="padding:16px;">
+        <div class="side-head"><h4>Their offer</h4><span class="badge" id="theirsBadge">waiting</span></div>
+        <div class="manifest" style="margin-bottom:0;">
+          <div class="manifest-head" style="grid-template-columns:22px 2fr 0.7fr 0.5fr 0.8fr;"><div>#</div><div>Item</div><div>Std</div><div>Qty</div><div>Floor</div></div>
+          <div id="theirsManifestBody"><div class="empty-manifest">Nothing offered yet.</div></div>
+        </div>
+        <div class="tally"><div class="label">Their total</div><div class="amount" id="theirsTally">0.00<small> ETH</small></div></div>
+      </div>
+    </div>
+
+    <div class="diff-strip" id="diffStrip">Both sides need to submit an offer before you can compare totals.</div>
+
+    <div class="actions-row">
+      <button class="btn-primary" id="confirmBtn" disabled>Confirm this manifest</button>
+      <button class="btn-primary" id="executeBtn" disabled>Execute swap</button>
+      <button class="btn-danger" id="cancelBtn">Cancel trade</button>
+      <button class="btn-ghost" id="leaveBtn">Leave trade room</button>
+    </div>
+
+    <div class="note">
+      Nothing has moved yet at this point — submitting an offer only records your items on-chain and approves the contract to move them. When both sides
+      confirm, "Execute swap" makes one call that transfers every item on both sides inside a single transaction. If any single transfer would fail —
+      a missing approval, an item that changed hands, a revoked allowance — the entire transaction reverts and nobody's items move. Approvals stay live
+      until you revoke them or the contract does, so cancelling a trade you no longer want is worth doing explicitly rather than just walking away.
+    </div>
+
+    <div class="log" id="log"></div>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  // ============================================================
+  // CONFIG — point this at your deployed swap contract.
+  // The ABI below is the interface this page expects. Adjust
+  // function names/params here to match what you actually ship.
+  //
+  // executeSwap is expected to be the ONLY function that moves
+  // tokens: it should pull every item on both sides via
+  // transferFrom/safeTransferFrom in one transaction, so a
+  // failure on any single leg reverts the whole swap.
+  // ============================================================
+  const SWAP_ADDRESS = "0x0000000000000000000000000000000000000000"; // <-- set after deploy
+  const SWAP_ABI = [
+    "function createTrade(bytes32 secretHash) returns (uint256)",
+    "function joinTrade(uint256 tradeId, bytes32 secret)",
+    "function setManifest(uint256 tradeId, address[] tokens, uint256[] tokenIds, uint256[] amounts, uint8[] standards)",
+    "function confirmManifest(uint256 tradeId)",
+    "function executeSwap(uint256 tradeId)",
+    "function cancelTrade(uint256 tradeId)",
+    "function getTrade(uint256 tradeId) view returns (address initiator, address counterparty, bool initiatorSubmitted, bool counterpartySubmitted, bool initiatorConfirmed, bool counterpartyConfirmed, bool executed, bool cancelled)",
+    "function getManifest(uint256 tradeId, address party) view returns (address[] tokens, uint256[] tokenIds, uint256[] amounts, uint8[] standards)",
+    "event TradeCreated(uint256 indexed tradeId, address indexed initiator, bytes32 secretHash)"
+  ];
+
+  const ERC721_ABI = [
+    "function isApprovedForAll(address owner, address operator) view returns (bool)",
+    "function setApprovalForAll(address operator, bool approved)"
+  ];
+  const ERC1155_ABI = [
+    "function isApprovedForAll(address owner, address operator) view returns (bool)",
+    "function setApprovalForAll(address operator, bool approved)"
+  ];
+
+  const STANDARD_CODE = { '721': 0, '1155': 1 };
+  const STANDARD_NAME = { 0: '721', 1: '1155' };
+
+  const CHAIN_IDS = { ethereum: 1, matic: 137, arbitrum: 42161, optimism: 10, base: 8453 };
+  const EXPLORERS = {
+    ethereum: "https://etherscan.io/tx/", matic: "https://polygonscan.com/tx/",
+    arbitrum: "https://arbiscan.io/tx/", optimism: "https://optimistic.etherscan.io/tx/",
+    base: "https://basescan.org/tx/"
+  };
+
+  let provider, signer, currentAccount = null;
+  let builderManifest = []; // items being composed before submitting
+  let trade = null; // { tradeId, secret, role: 'initiator'|'counterparty', chain }
+  let mineItems = [], theirsItems = [];
+
+  const el = (id) => document.getElementById(id);
+  const log = (msg, type) => {
+    const line = document.createElement('div');
+    line.className = 'log-line ' + (type || 'info');
+    line.innerHTML = msg;
+    const box = el('log');
+    if (box) box.prepend(line);
+  };
+  const short = (addr) => addr.slice(0,6) + '…' + addr.slice(-4);
+
+  function swapContract(){ return new ethers.Contract(SWAP_ADDRESS, SWAP_ABI, signer); }
+  function swapRead(){ return new ethers.Contract(SWAP_ADDRESS, SWAP_ABI, provider); }
+
+  // ---------------- wallet ----------------
+  async function connectWallet(){
+    if (!window.ethereum){ log('No wallet found. Install MetaMask or another injected wallet, then reload.', 'err'); return; }
+    try {
+      el('connectBtn').disabled = true;
+      provider = new ethers.providers.Web3Provider(window.ethereum, "any");
+      const accounts = await provider.send("eth_requestAccounts", []);
+      signer = provider.getSigner();
+      currentAccount = accounts[0];
+      const network = await provider.getNetwork();
+      el('walletMeta').innerHTML = `<strong>${short(currentAccount)}</strong> · chain ${network.chainId}`;
+      el('connectBtn').textContent = 'Connected';
+      log(`Wallet connected: ${short(currentAccount)}`, 'ok');
+      window.ethereum.on('accountsChanged', () => window.location.reload());
+      window.ethereum.on('chainChanged', () => window.location.reload());
+    } catch (err){
+      log('Connection failed or was rejected: ' + (err.message || err), 'err');
+    } finally { el('connectBtn').disabled = false; }
+  }
+
+  // ---------------- floor price lookup ----------------
+  async function fetchFloorPrice(chainSlug, address){
+    const apiKey = el('apiKey').value.trim();
+    if (!apiKey) return null;
+    try {
+      const headers = { accept: "application/json", "x-api-key": apiKey };
+      const cRes = await fetch(`https://api.opensea.io/api/v2/chain/${chainSlug}/contract/${address}`, { headers });
+      if (!cRes.ok) return null;
+      const cData = await cRes.json();
+      const slug = cData && cData.collection;
+      if (!slug) return null;
+      const sRes = await fetch(`https://api.opensea.io/api/v2/collections/${slug}/stats`, { headers });
+      if (!sRes.ok) return null;
+      const sData = await sRes.json();
+      const floor = sData && sData.total && sData.total.floor_price;
+      return (typeof floor === 'number') ? { floor, collection: slug } : null;
+    } catch (err){ console.warn('OpenSea lookup failed', err); return null; }
+  }
+
+  // ---------------- builder (compose an offer before submitting) ----------------
+  function renderBuilder(){
+    const body = el('builderManifestBody');
+    body.innerHTML = '';
+    if (builderManifest.length === 0){
+      body.innerHTML = '<div class="empty-manifest" id="builderEmpty">Nothing added yet.</div>';
+      el('builderTally').innerHTML = '0.00<small> ETH</small>';
+      el('lockInBtn').disabled = true;
+      return;
+    }
+    let total = 0;
+    builderManifest.forEach((item, idx) => {
+      const known = typeof item.floor === 'number';
+      if (known) total += item.floor * item.qty;
+      const row = document.createElement('div');
+      row.className = 'manifest-row';
+      row.innerHTML = `
+        <div class="num">${String(idx+1).padStart(2,'0')}</div>
+        <div><div class="addr">${short(item.address)} <span class="sub">#${item.tokenId}</span></div>${item.collection ? `<div class="sub">${item.collection}</div>` : ''}</div>
+        <div class="sub">ERC-${item.standard}</div>
+        <div class="sub">${item.qty}</div>
+        <div class="floor ${known ? '' : 'pending'}">${known ? (item.floor*item.qty).toFixed(3) + ' Ξ' : '—'}</div>
+        <button class="remove-btn" data-idx="${idx}">×</button>`;
+      body.appendChild(row);
+    });
+    el('builderTally').innerHTML = total.toFixed(3) + '<small> ETH</small>';
+    body.querySelectorAll('.remove-btn').forEach(btn => btn.addEventListener('click', () => {
+      builderManifest.splice(parseInt(btn.dataset.idx,10), 1);
+      renderBuilder();
+    }));
+    el('lockInBtn').disabled = !currentAccount;
+  }
+
+  el('addBtn').addEventListener('click', async () => {
+    const address = el('nftAddr').value.trim();
+    const tokenId = el('tokenId').value.trim();
+    const standard = el('standard').value;
+    const qty = Math.max(1, parseInt(el('qty').value,10) || 1);
+    const chainSlug = el('chainSelect').value;
+    if (!ethers.utils.isAddress(address)){ log('That contract address doesn\'t look valid.', 'err'); return; }
+    if (tokenId === '' || isNaN(Number(tokenId))){ log('Enter a numeric token ID.', 'err'); return; }
+
+    el('addBtn').disabled = true; el('addBtn').textContent = 'Looking up floor…';
+    const priceData = await fetchFloorPrice(chainSlug, address);
+    el('addBtn').disabled = false; el('addBtn').textContent = '+ Add to your offer';
+
+    builderManifest.push({
+      address, tokenId, standard, qty, chain: chainSlug,
+      floor: priceData ? priceData.floor : null,
+      collection: priceData ? priceData.collection : null
+    });
+    log(priceData ? `Added ${short(address)} #${tokenId} — floor ${priceData.floor} ETH.` : `Added ${short(address)} #${tokenId}. No floor price available.`, priceData ? 'ok' : 'info');
+    el('nftAddr').value = ''; el('tokenId').value = ''; el('qty').value = 1;
+    renderBuilder();
+  });
+
+  // ---------------- entry: new trade vs join trade ----------------
+  let pendingMode = null; // 'new' | 'join'
+  let pendingJoin = null; // { tradeId, secret }
+
+  el('goNewTrade').addEventListener('click', () => {
+    if (!currentAccount){ log('Connect your wallet first.', 'err'); return; }
+    pendingMode = 'new';
+    el('entryView').classList.add('hidden');
+    el('builderView').classList.remove('hidden');
+    el('builderModeNote').textContent = 'This becomes your offer. Submitting it creates the trade on-chain, records your items, and approves the contract to move them later — nothing transfers until both sides confirm and execute.';
+    el('lockInBtn').textContent = 'Create trade & submit offer';
+  });
+
+  el('goJoinTrade').addEventListener('click', () => {
+    if (!currentAccount){ log('Connect your wallet first.', 'err'); return; }
+    const raw = el('joinLink').value.trim();
+    const parsed = parseJoinInput(raw);
+    if (!parsed){ log('Couldn\'t read that link or trade ID + secret. Paste exactly what you were sent.', 'err'); return; }
+    pendingMode = 'join';
+    pendingJoin = parsed;
+    el('entryView').classList.add('hidden');
+    el('builderView').classList.remove('hidden');
+    el('builderModeNote').textContent = `Joining trade #${parsed.tradeId}. This becomes your offer. Submitting it joins the trade, records your items, and approves the contract to move them later.`;
+    el('lockInBtn').textContent = 'Join trade & submit offer';
+  });
+
+  function parseJoinInput(raw){
+    try {
+      if (raw.includes('#')){
+        const hash = raw.split('#')[1] || '';
+        const params = new URLSearchParams(hash);
+        const tradeId = params.get('trade');
+        const secret = params.get('key');
+        if (tradeId && secret) return { tradeId, secret };
+      }
+      if (raw.includes(':')){
+        const [tradeId, secret] = raw.split(':');
+        if (tradeId && secret) return { tradeId: tradeId.trim(), secret: secret.trim() };
+      }
+    } catch(e){}
+    return null;
+  }
+
+  el('lockInBtn').addEventListener('click', async () => {
+    if (builderManifest.length === 0){ log('Add at least one item before submitting.', 'err'); return; }
+    el('lockInBtn').disabled = true;
+    try {
+      if (pendingMode === 'new'){
+        await createTradeFlow();
+      } else {
+        await joinTradeFlow();
+      }
+    } catch (err){
+      log('Failed to submit offer: ' + ((err && err.reason) || (err && err.message) || err), 'err');
+    } finally {
+      el('lockInBtn').disabled = false;
+    }
+  });
+
+  async function ensureRightNetwork(){
+    const network = await provider.getNetwork();
+    const chainSlug = el('chainSelect').value;
+    const expected = CHAIN_IDS[chainSlug];
+    if (network.chainId !== expected){
+      log(`Your wallet is on chain ${network.chainId}, but you selected ${chainSlug} (chain ${expected}). Switch networks and try again.`, 'err');
+      return false;
+    }
+    return true;
+  }
+
+  async function createTradeFlow(){
+    if (!(await ensureRightNetwork())) return;
+    const secretBytes = ethers.utils.randomBytes(32);
+    const secret = ethers.utils.hexlify(secretBytes);
+    const secretHash = ethers.utils.keccak256(secret);
+
+    log('Creating trade on-chain…', 'info');
+    const contract = swapContract();
+    const tx = await contract.createTrade(secretHash);
+    const receipt = await tx.wait();
+    const iface = new ethers.utils.Interface(SWAP_ABI);
+    let tradeId = null;
+    for (const logEntry of receipt.logs){
+      try {
+        const parsed = iface.parseLog(logEntry);
+        if (parsed.name === 'TradeCreated'){ tradeId = parsed.args.tradeId.toString(); break; }
+      } catch(e){}
+    }
+    if (!tradeId){ log('Trade created, but couldn\'t read the trade ID from the transaction log — check your contract emits TradeCreated.', 'err'); return; }
+
+    log(`Trade #${tradeId} created.`, 'ok');
+    trade = { tradeId, secret, role: 'initiator', chain: el('chainSelect').value };
+    persistTrade();
+    await approveAndSubmitManifest(builderManifest, tradeId);
+    enterTradeRoom();
+  }
+
+  async function joinTradeFlow(){
+    if (!(await ensureRightNetwork())) return;
+    log(`Joining trade #${pendingJoin.tradeId}…`, 'info');
+    const contract = swapContract();
+    const tx = await contract.joinTrade(pendingJoin.tradeId, pendingJoin.secret);
+    await tx.wait();
+    log(`Joined trade #${pendingJoin.tradeId}.`, 'ok');
+    trade = { tradeId: pendingJoin.tradeId, secret: pendingJoin.secret, role: 'counterparty', chain: el('chainSelect').value };
+    persistTrade();
+    await approveAndSubmitManifest(builderManifest, pendingJoin.tradeId);
+    enterTradeRoom();
+  }
+
+  // Approves the swap contract to move each collection's items, then
+  // records the offer on-chain. No token ever leaves the caller's
+  // wallet here — that only happens inside executeSwap.
+  async function approveAndSubmitManifest(items, tradeId){
+    const contract = swapContract();
+    const distinctContracts = {};
+    items.forEach(item => { distinctContracts[item.standard + ':' + item.address.toLowerCase()] = item; });
+
+    for (const key of Object.keys(distinctContracts)){
+      const [standard, address] = key.split(':');
+      const abi = standard === '721' ? ERC721_ABI : ERC1155_ABI;
+      const token = new ethers.Contract(address, abi, signer);
+      const approved = await token.isApprovedForAll(currentAccount, SWAP_ADDRESS);
+      if (!approved){
+        log(`Approving the swap contract to move items from ${short(address)}…`, 'info');
+        const approveTx = await token.setApprovalForAll(SWAP_ADDRESS, true);
+        await approveTx.wait();
+        log('Approval confirmed.', 'ok');
+      } else {
+        log(`Already approved for ${short(address)}.`, 'info');
+      }
+    }
+
+    const tokens = items.map(i => i.address);
+    const tokenIds = items.map(i => i.tokenId);
+    const amounts = items.map(i => i.qty);
+    const standards = items.map(i => STANDARD_CODE[i.standard]);
+
+    log('Recording your offer on-chain…', 'info');
+    const tx = await contract.setManifest(tradeId, tokens, tokenIds, amounts, standards);
+    await tx.wait();
+    log('Offer recorded. Nothing has transferred — it moves only when the swap executes.', 'ok');
+  }
+
+  // ---------------- persistence so a refresh doesn't lose the trade ----------------
+  function persistTrade(){ localStorage.setItem('manifest.trade', JSON.stringify(trade)); }
+  function loadPersistedTrade(){
+    try { const raw = localStorage.getItem('manifest.trade'); return raw ? JSON.parse(raw) : null; } catch(e){ return null; }
+  }
+  function clearPersistedTrade(){ localStorage.removeItem('manifest.trade'); trade = null; }
+
+  // ---------------- trade room ----------------
+  function enterTradeRoom(){
+    el('entryView').classList.add('hidden');
+    el('builderView').classList.add('hidden');
+    el('tradeRoomView').classList.remove('hidden');
+    el('tradeIdLabel').textContent = '#' + trade.tradeId;
+    el('roleLabel').textContent = trade.role === 'initiator' ? 'the initiator' : 'the counterparty';
+    if (trade.role === 'initiator'){
+      const link = `${location.origin}${location.pathname}#trade=${trade.tradeId}&key=${trade.secret}`;
+      el('shareLink').value = link;
+      el('secretRow').classList.remove('hidden');
+    } else {
+      el('secretRow').classList.add('hidden');
+    }
+    refreshTrade();
+  }
+
+  el('copyLinkBtn').addEventListener('click', () => {
+    el('shareLink').select();
+    document.execCommand('copy');
+    log('Invite link copied. Send it to the other party over a channel you trust.', 'ok');
+  });
+
+  el('refreshBtn').addEventListener('click', refreshTrade);
+
+  async function refreshTrade(){
+    if (!trade) return;
+    try {
+      const reader = swapRead();
+      const t = await reader.getTrade(trade.tradeId);
+      const iAmInitiator = trade.role === 'initiator';
+      const mineSubmitted = iAmInitiator ? t.initiatorSubmitted : t.counterpartySubmitted;
+      const theirsSubmitted = iAmInitiator ? t.counterpartySubmitted : t.initiatorSubmitted;
+      const mineConfirmed = iAmInitiator ? t.initiatorConfirmed : t.counterpartyConfirmed;
+      const theirsConfirmed = iAmInitiator ? t.counterpartyConfirmed : t.initiatorConfirmed;
+
+      setBadge('mineBadge', mineSubmitted, mineConfirmed);
+      setBadge('theirsBadge', theirsSubmitted, theirsConfirmed);
+
+      const myAddress = iAmInitiator ? t.initiator : t.counterparty;
+      const theirAddress = iAmInitiator ? t.counterparty : t.initiator;
+
+      mineItems = mineSubmitted && myAddress !== ethers.constants.AddressZero ? await loadManifestFor(reader, myAddress) : [];
+      theirsItems = theirsSubmitted && theirAddress !== ethers.constants.AddressZero ? await loadManifestFor(reader, theirAddress) : [];
+
+      renderSide('mine', mineItems);
+      renderSide('theirs', theirsItems);
+      renderDiff();
+
+      el('confirmBtn').disabled = !(mineSubmitted && theirsSubmitted) || mineConfirmed;
+      el('confirmBtn').textContent = mineConfirmed ? 'Waiting on the other party to confirm' : 'Confirm this manifest';
+      el('executeBtn').disabled = !(mineConfirmed && theirsConfirmed) || t.executed || t.cancelled;
+      el('submitMineBtn').disabled = mineSubmitted;
+      el('submitMineBtn').textContent = mineSubmitted ? 'Your offer is submitted' : 'Approve & submit your offer';
+
+      if (t.executed) log('This trade has executed — items have swapped.', 'ok');
+      if (t.cancelled) log('This trade was cancelled.', 'info');
+    } catch (err){
+      log('Couldn\'t read trade state: ' + ((err && err.message) || err), 'err');
+    }
+  }
+
+  function setBadge(id, submitted, confirmed){
+    const badge = el(id);
+    if (confirmed){ badge.textContent = 'confirmed'; badge.className = 'badge on'; }
+    else if (submitted){ badge.textContent = 'submitted'; badge.className = 'badge wait'; }
+    else { badge.textContent = 'not submitted'; badge.className = 'badge'; }
+  }
+
+  async function loadManifestFor(reader, address){
+    const res = await reader.getManifest(trade.tradeId, address);
+    const items = [];
+    for (let i = 0; i < res.tokens.length; i++){
+      items.push({
+        address: res.tokens[i],
+        tokenId: res.tokenIds[i].toString(),
+        qty: res.amounts[i].toString(),
+        standard: STANDARD_NAME[res.standards[i]] || '721'
+      });
+    }
+    // best-effort floor price fill-in, non-blocking on failure
+    for (const item of items){
+      const priceData = await fetchFloorPrice(trade.chain, item.address);
+      item.floor = priceData ? priceData.floor : null;
+      item.collection = priceData ? priceData.collection : null;
+    }
+    return items;
+  }
+
+  function renderSide(prefix, items){
+    const body = el(prefix + 'ManifestBody');
+    const tallyEl = el(prefix + 'Tally');
+    body.innerHTML = '';
+    if (items.length === 0){
+      body.innerHTML = '<div class="empty-manifest">Nothing offered yet.</div>';
+      tallyEl.innerHTML = '0.00<small> ETH</small>';
+      return;
+    }
+    let total = 0;
+    items.forEach((item, idx) => {
+      const known = typeof item.floor === 'number';
+      if (known) total += item.floor * Number(item.qty);
+      const row = document.createElement('div');
+      row.className = 'manifest-row';
+      row.style.gridTemplateColumns = '22px 2fr 0.7fr 0.5fr 0.8fr';
+      row.innerHTML = `
+        <div class="num">${String(idx+1).padStart(2,'0')}</div>
+        <div><div class="addr">${short(item.address)} <span class="sub">#${item.tokenId}</span></div>${item.collection ? `<div class="sub">${item.collection}</div>` : ''}</div>
+        <div class="sub">ERC-${item.standard}</div>
+        <div class="sub">${item.qty}</div>
+        <div class="floor ${known ? '' : 'pending'}">${known ? (item.floor*item.qty).toFixed(3)+' Ξ' : '—'}</div>`;
+      body.appendChild(row);
+    });
+    tallyEl.innerHTML = total.toFixed(3) + '<small> ETH</small>';
+  }
+
+  function renderDiff(){
+    const mineTotal = mineItems.reduce((s,i) => s + (typeof i.floor === 'number' ? i.floor*Number(i.qty) : 0), 0);
+    const theirsTotal = theirsItems.reduce((s,i) => s + (typeof i.floor === 'number' ? i.floor*Number(i.qty) : 0), 0);
+    const strip = el('diffStrip');
+    if (mineItems.length === 0 || theirsItems.length === 0){
+      strip.textContent = 'Both sides need to submit an offer before you can compare totals.';
+      return;
+    }
+    const diff = mineTotal - theirsTotal;
+    const pct = theirsTotal > 0 ? Math.abs(diff / theirsTotal * 100).toFixed(1) : '—';
+    strip.innerHTML = diff === 0
+      ? `<strong>Even trade</strong> by floor estimate — both sides total ${mineTotal.toFixed(3)} ETH.`
+      : diff > 0
+        ? `You're offering <strong>${diff.toFixed(3)} ETH more</strong> than the other side by floor estimate (${pct}% difference).`
+        : `You're offering <strong>${Math.abs(diff).toFixed(3)} ETH less</strong> than the other side by floor estimate (${pct}% difference).`;
+  }
+
+  el('submitMineBtn').addEventListener('click', async () => {
+    if (builderManifest.length === 0){
+      log('Your offer for this trade was already submitted in the previous step — if you need to change it, cancel and start a new trade with the full offer.', 'info');
+      return;
+    }
+    el('submitMineBtn').disabled = true;
+    try { await approveAndSubmitManifest(builderManifest, trade.tradeId); builderManifest = []; await refreshTrade(); }
+    catch (err){ log('Submit failed: ' + ((err && err.reason) || (err && err.message) || err), 'err'); }
+    finally { el('submitMineBtn').disabled = false; }
+  });
+
+  el('confirmBtn').addEventListener('click', async () => {
+    el('confirmBtn').disabled = true;
+    try {
+      const contract = swapContract();
+      log('Confirming manifest…', 'info');
+      const tx = await contract.confirmManifest(trade.tradeId);
+      await tx.wait();
+      log('Confirmed. Waiting on the other party.', 'ok');
+      await refreshTrade();
+    } catch (err){ log('Confirm failed: ' + ((err && err.reason) || (err && err.message) || err), 'err'); }
+    finally { el('confirmBtn').disabled = false; }
+  });
+
+  el('executeBtn').addEventListener('click', async () => {
+    el('executeBtn').disabled = true;
+    try {
+      const contract = swapContract();
+      log('Executing swap — every item on both sides moves in this one transaction…', 'info');
+      const explorer = EXPLORERS[trade.chain] || '';
+      const tx = await contract.executeSwap(trade.tradeId);
+      log(`Tx submitted: <a href="${explorer}${tx.hash}" target="_blank" rel="noopener">${short(tx.hash)}</a>`, 'info');
+      await tx.wait();
+      log('Swap executed — items delivered to both sides.', 'ok');
+      await refreshTrade();
+    } catch (err){
+      log('Execute failed — the transaction reverted, so nothing moved on either side: ' + ((err && err.reason) || (err && err.message) || err), 'err');
+    } finally { el('executeBtn').disabled = false; }
+  });
+
+  el('cancelBtn').addEventListener('click', async () => {
+    if (!confirm('Cancel this trade? This should not move any items — it just closes out the trade record. If you want to revoke approvals too, do that separately from your wallet.')) return;
+    try {
+      const contract = swapContract();
+      const tx = await contract.cancelTrade(trade.tradeId);
+      await tx.wait();
+      log('Trade cancelled.', 'ok');
+      await refreshTrade();
+    } catch (err){ log('Cancel failed: ' + ((err && err.reason) || (err && err.message) || err), 'err'); }
+  });
+
+  el('leaveBtn').addEventListener('click', () => {
+    clearPersistedTrade();
+    el('tradeRoomView').classList.add('hidden');
+    el('builderView').classList.add('hidden');
+    el('entryView').classList.remove('hidden');
+    builderManifest = [];
+    renderBuilder();
+  });
+
+  // ---------------- boot ----------------
+  el('connectBtn').addEventListener('click', connectWallet);
+
+  (function boot(){
+    // if arriving via an invite link, prefill the join field
+    if (location.hash.includes('trade=')){
+      const params = new URLSearchParams(location.hash.slice(1));
+      const t = params.get('trade'), k = params.get('key');
+      if (t && k) el('joinLink').value = `${t}:${k}`;
+    }
+    const persisted = loadPersistedTrade();
+    if (persisted){
+      trade = persisted;
+      el('entryView').classList.add('hidden');
+      el('tradeRoomView').classList.remove('hidden');
+      el('tradeIdLabel').textContent = '#' + trade.tradeId;
+      el('roleLabel').textContent = trade.role === 'initiator' ? 'the initiator' : 'the counterparty';
+      if (trade.role === 'initiator'){
+        el('shareLink').value = `${location.origin}${location.pathname}#trade=${trade.tradeId}&key=${trade.secret}`;
+        el('secretRow').classList.remove('hidden');
+      } else {
+        el('secretRow').classList.add('hidden');
+      }
+    }
+    renderBuilder();
+  })();
+})();
+</script>
+</body>
+</html>
